@@ -96,7 +96,7 @@ async def get_movie_details(tmdb_id: int) -> str:
 
 
 @mcp.tool()
-async def add_movie(tmdb_id: int, quality_profile_id: int = 1) -> str:
+async def add_movie(tmdb_id: int, quality_profile_id: int = 7) -> str:
     """Add a movie to Radarr for download by its TMDB ID.
     Optionally specify a quality_profile_id (default: 1).
     The movie will be monitored and an automatic search will start."""

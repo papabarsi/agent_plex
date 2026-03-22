@@ -112,7 +112,7 @@ async def get_series_details(tvdb_id: int) -> str:
 @mcp.tool()
 async def add_series(
     tvdb_id: int,
-    quality_profile_id: int = 1,
+    quality_profile_id: int = 7,
     monitor: str = "all",
 ) -> str:
     """Add a TV series to Sonarr for download by its TVDB ID.

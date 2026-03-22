@@ -20,10 +20,13 @@ logger = logging.getLogger("movie-agent")
 
 # Initialize Langfuse — enables automatic OTEL trace export from Strands
 langfuse = get_client()
-if langfuse.auth_check():
-    logger.info("Langfuse connected")
-else:
-    logger.warning("Langfuse auth failed — tracing disabled (check LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY)")
+try:
+    if langfuse.auth_check():
+        logger.info("Langfuse connected")
+    else:
+        logger.warning("Langfuse auth failed — tracing disabled (check LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY)")
+except Exception:
+    logger.warning("Langfuse unreachable — tracing disabled (will work without it)")
 
 # ── Config ────────────────────────────────────────────────────
 
