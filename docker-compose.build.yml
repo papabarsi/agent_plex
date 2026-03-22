@@ -1,0 +1,24 @@
+services:
+  webui:
+    build: ./webui
+    image: media-webui:latest
+
+  movie-agent:
+    build: ./movie-agent
+    image: movie-agent:latest
+
+  movie-mcp-server:
+    build: ./movie-mcp-server
+    image: movie-mcp-server:latest
+
+  tv-agent:
+    build: ./tv-agent
+    image: tv-agent:latest
+
+  tv-mcp-server:
+    build: ./tv-mcp-server
+    image: tv-mcp-server:latest
+
+  media-agent:
+    build: ./media-agent
+    image: media-agent:latest
