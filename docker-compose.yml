@@ -46,6 +46,7 @@ services:
       - RADARR_API_KEY=${RADARR_API_KEY}
       - PLEX_URL=${PLEX_URL}
       - PLEX_TOKEN=${PLEX_TOKEN}
+      - RADARR_QUALITY_PROFILE_ID=${RADARR_QUALITY_PROFILE_ID:-1}
     networks:
       - media-agent-net
 
@@ -82,6 +83,7 @@ services:
       - SONARR_API_KEY=${SONARR_API_KEY}
       - PLEX_URL=${PLEX_URL}
       - PLEX_TOKEN=${PLEX_TOKEN}
+      - SONARR_QUALITY_PROFILE_ID=${SONARR_QUALITY_PROFILE_ID:-1}
     networks:
       - media-agent-net
 
@@ -268,7 +270,7 @@ services:
     volumes:
       - langfuse_redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "langfuse-redis-secret", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a ${LANGFUSE_REDIS_PASSWORD:-langfuse-redis-secret} ping"]
       interval: 3s
       timeout: 10s
       retries: 10

@@ -8,6 +8,7 @@ SONARR_URL = os.environ.get("SONARR_URL", "").rstrip("/")
 SONARR_API_KEY = os.environ.get("SONARR_API_KEY", "")
 PLEX_URL = os.environ.get("PLEX_URL", "").rstrip("/")
 PLEX_TOKEN = os.environ.get("PLEX_TOKEN", "")
+SONARR_QUALITY_PROFILE_ID = int(os.environ.get("SONARR_QUALITY_PROFILE_ID", "1"))
 
 
 def sonarr_headers():
@@ -112,7 +113,7 @@ async def get_series_details(tvdb_id: int) -> str:
 @mcp.tool()
 async def add_series(
     tvdb_id: int,
-    quality_profile_id: int = 7,
+    quality_profile_id: int = SONARR_QUALITY_PROFILE_ID,
     monitor: str = "all",
 ) -> str:
     """Add a TV series to Sonarr for download by its TVDB ID.

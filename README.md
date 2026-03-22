@@ -4,7 +4,7 @@ AI-powered media management using Strands Agents + MCP + Claude.
 
 ## Quick Start
 
-1. Copy `.env.example` to `.env` and fill in your API keys and service URLs
+1. Copy `env.example` to `.env` and fill in your API keys and service URLs
 2. Deploy as a Portainer stack or run:
 
 ```bash
@@ -40,7 +40,7 @@ WebUI (:3000) → Media Agent (:8000) → Movie Agent (:8001) → Movie MCP (:81
 
 ## Configuration
 
-Copy `.env.example` to `.env` and fill in:
+Copy `env.example` to `.env` and fill in:
 
 - `ANTHROPIC_API_KEY` — your Claude API key
 - `RADARR_URL` / `RADARR_API_KEY` — your Radarr instance

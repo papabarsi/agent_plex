@@ -8,6 +8,7 @@ RADARR_URL = os.environ.get("RADARR_URL", "").rstrip("/")
 RADARR_API_KEY = os.environ.get("RADARR_API_KEY", "")
 PLEX_URL = os.environ.get("PLEX_URL", "").rstrip("/")
 PLEX_TOKEN = os.environ.get("PLEX_TOKEN", "")
+RADARR_QUALITY_PROFILE_ID = int(os.environ.get("RADARR_QUALITY_PROFILE_ID", "1"))
 
 
 def radarr_headers():
@@ -96,9 +97,9 @@ async def get_movie_details(tmdb_id: int) -> str:
 
 
 @mcp.tool()
-async def add_movie(tmdb_id: int, quality_profile_id: int = 7) -> str:
+async def add_movie(tmdb_id: int, quality_profile_id: int = RADARR_QUALITY_PROFILE_ID) -> str:
     """Add a movie to Radarr for download by its TMDB ID.
-    Optionally specify a quality_profile_id (default: 1).
+    Optionally specify a quality_profile_id (uses RADARR_QUALITY_PROFILE_ID env var default).
     The movie will be monitored and an automatic search will start."""
     async with httpx.AsyncClient(timeout=15) as client:
         # Look up the movie first
