@@ -23,8 +23,11 @@ services:
     ports:
       - "8001:8001"
     environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - LLM_API_KEY=${LITELLM_API_KEY:-sk-local}
       - MOVIE_MCP_URL=http://movie-mcp-server:8101
+      - LITELLM_BASE_URL=http://litellm:4000/v1
+      - MODEL_ID=${MODEL_ID:-nemotron-3-free}
+      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-4096}
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
       - LANGFUSE_BASE_URL=http://langfuse-web:3000
@@ -35,6 +38,7 @@ services:
       - OTEL_EXPORTER_OTLP_TIMEOUT=2000
     depends_on:
       - movie-mcp-server
+      - litellm
     networks:
       - media-agent-net
 
@@ -65,8 +69,11 @@ services:
     ports:
       - "8002:8002"
     environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - LLM_API_KEY=${LITELLM_API_KEY:-sk-local}
       - TV_MCP_URL=http://tv-mcp-server:8102
+      - LITELLM_BASE_URL=http://litellm:4000/v1
+      - MODEL_ID=${MODEL_ID:-nemotron-3-free}
+      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-4096}
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
       - LANGFUSE_BASE_URL=http://langfuse-web:3000
@@ -77,6 +84,7 @@ services:
       - OTEL_EXPORTER_OTLP_TIMEOUT=2000
     depends_on:
       - tv-mcp-server
+      - litellm
     networks:
       - media-agent-net
 
@@ -107,9 +115,12 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - LLM_API_KEY=${LITELLM_API_KEY:-sk-local}
       - MOVIE_AGENT_URL=http://movie-agent:8001
       - TV_AGENT_URL=http://tv-agent:8002
+      - LITELLM_BASE_URL=http://litellm:4000/v1
+      - MODEL_ID=${MODEL_ID:-nemotron-3-free}
+      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-4096}
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
       - LANGFUSE_BASE_URL=http://langfuse-web:3000
@@ -121,6 +132,30 @@ services:
     depends_on:
       - movie-agent
       - tv-agent
+      - litellm
+    networks:
+      - media-agent-net
+
+  # ── LiteLLM Proxy ─────────────────────────
+  litellm:
+    image: ghcr.io/berriai/litellm:v1.83.7-stable
+    container_name: litellm
+    restart: unless-stopped
+    security_opt:
+      - apparmor:unconfined
+    ports:
+      - "4001:4000"
+    volumes:
+      - ./litellm/config.yaml:/app/config.yaml
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - LANGFUSE_HOST=http://langfuse-web:3000
+    command: --config /app/config.yaml --port 4000
+    depends_on:
+      - langfuse-web
     networks:
       - media-agent-net
 
