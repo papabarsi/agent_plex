@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from strands import Agent, tool
-from strands.models.anthropic import AnthropicModel
+from strands.models.openai import OpenAIModel
 from langfuse import get_client, propagate_attributes
 
 logging.basicConfig(level=logging.INFO)
@@ -28,10 +28,12 @@ except Exception:
 
 # ── Config ────────────────────────────────────────────────────
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+LLM_API_KEY = os.environ.get("LLM_API_KEY", "sk-local")
 MOVIE_AGENT_URL = os.environ.get("MOVIE_AGENT_URL", "http://movie-agent:8001")
 TV_AGENT_URL = os.environ.get("TV_AGENT_URL", "http://tv-agent:8002")
-MODEL_ID = os.environ.get("MODEL_ID", "claude-sonnet-4-20250514")
+LITELLM_BASE_URL = os.environ.get("LITELLM_BASE_URL", "http://litellm:4000/v1")
+MODEL_ID = os.environ.get("MODEL_ID", "nemotron-3-free")
+LLM_MAX_TOKENS = int(os.environ.get("LLM_MAX_TOKENS", "4096"))
 
 SYSTEM_PROMPT = """You are a media assistant that orchestrates movie and TV show requests.
 
@@ -51,7 +53,8 @@ Guidelines:
 # ── State ─────────────────────────────────────────────────────
 
 sessions: dict[str, list[dict]] = defaultdict(list)
-agent: Agent | None = None
+agents: dict[str, Agent] = {}
+model: OpenAIModel | None = None
 
 
 # ── Tools ─────────────────────────────────────────────────────
@@ -108,22 +111,42 @@ def tv_agent(request: str) -> str:
 
 # ── App ───────────────────────────────────────────────────────
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Create the orchestrator agent on startup."""
-    global agent
-
-    model = AnthropicModel(
-        client_args={"api_key": ANTHROPIC_API_KEY},
+def build_model() -> OpenAIModel:
+    """Build the OpenAI-compatible model used by Strands."""
+    logger.info(f"Routing LLM calls through {LITELLM_BASE_URL} using {MODEL_ID}")
+    return OpenAIModel(
+        client_args={
+            "api_key": LLM_API_KEY,
+            "base_url": LITELLM_BASE_URL,
+        },
         model_id=MODEL_ID,
-        max_tokens=1024,
+        params={
+            "max_tokens": LLM_MAX_TOKENS,
+            "extra_body": {
+                "reasoning": {
+                    "effort": "none",
+                    "exclude": True,
+                },
+            },
+        },
     )
 
-    agent = Agent(
-        model=model,
+
+def build_agent() -> Agent:
+    """Build an isolated orchestrator agent for one chat session."""
+    return Agent(
+        model=model or build_model(),
         system_prompt=SYSTEM_PROMPT,
         tools=[movie_agent, tv_agent],
     )
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Create the orchestrator agent on startup."""
+    global model
+
+    model = build_model()
 
     # Verify sub-agents are reachable
     for name, url in [("Movie", MOVIE_AGENT_URL), ("TV", TV_AGENT_URL)]:
@@ -160,7 +183,7 @@ class ChatResponse(BaseModel):
 @app.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
     """Handle a chat message. Routes to Movie/TV sub-agents via the orchestrator."""
-    if agent is None:
+    if model is None:
         return JSONResponse(
             status_code=503,
             content={"error": "Agent not initialized yet."},
@@ -169,11 +192,15 @@ async def chat(req: ChatRequest):
     session_id = req.session_id or str(uuid.uuid4())
 
     sessions[session_id].append({"role": "user", "content": req.message})
+    session_agent = agents.get(session_id)
+    if session_agent is None:
+        session_agent = build_agent()
+        agents[session_id] = session_agent
 
     try:
         with langfuse.start_as_current_observation(as_type="span", name="media-agent-chat"):
             with propagate_attributes(session_id=session_id):
-                result = agent(req.message)
+                result = session_agent(req.message)
                 response_text = str(result)
 
         sessions[session_id].append({"role": "assistant", "content": response_text})
@@ -200,7 +227,7 @@ async def health():
 
     return {
         "status": "ok",
-        "agent_ready": agent is not None,
+        "agent_ready": model is not None,
         "sub_agents": sub_agents,
     }
 

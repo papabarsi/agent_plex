@@ -1,6 +1,6 @@
 # Media Agent Stack
 
-AI-powered media management using Strands Agents + MCP + Claude.
+AI-powered media management using Strands Agents + MCP + OpenRouter.
 
 ## Quick Start
 
@@ -19,7 +19,7 @@ docker-compose up --build
 WebUI (:3000) → Media Agent (:8000) → Movie Agent (:8001) → Movie MCP (:8101) → Radarr + Plex
                    (orchestrator)   → TV Agent (:8002)    → TV MCP (:8102)    → Sonarr + Plex
                         ↕
-                  Claude API (Haiku 4.5)
+                  LiteLLM → OpenRouter → NVIDIA Nemotron 3 Nano 30B A3B (free)
 ```
 
 ## What it does
@@ -42,7 +42,8 @@ WebUI (:3000) → Media Agent (:8000) → Movie Agent (:8001) → Movie MCP (:81
 
 Copy `env.example` to `.env` and fill in:
 
-- `ANTHROPIC_API_KEY` — your Claude API key
+- `OPENROUTER_API_KEY` — your OpenRouter API key
+- `MODEL_ID` — optional LiteLLM model alias; defaults to `nemotron-3-free`
 - `RADARR_URL` / `RADARR_API_KEY` — your Radarr instance
 - `SONARR_URL` / `SONARR_API_KEY` — your Sonarr instance
 - `PLEX_URL` / `PLEX_TOKEN` — your Plex instance

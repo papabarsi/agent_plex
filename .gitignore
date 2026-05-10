@@ -1,5 +1,8 @@
 .env
+.env.op
 __pycache__/
 *.pyc
 .venv/
 system-test.md
+.gitnexus
+graphify-out/

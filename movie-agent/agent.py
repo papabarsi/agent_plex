@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from strands import Agent
-from strands.models.anthropic import AnthropicModel
+from strands.models.openai import OpenAIModel
 from strands.tools.mcp import MCPClient
 from mcp.client.streamable_http import streamablehttp_client
 from langfuse import get_client, propagate_attributes
@@ -30,9 +30,11 @@ except Exception:
 
 # ── Config ────────────────────────────────────────────────────
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+LLM_API_KEY = os.environ.get("LLM_API_KEY", "sk-local")
 MOVIE_MCP_URL = os.environ.get("MOVIE_MCP_URL", "http://movie-mcp-server:8101")
-MODEL_ID = os.environ.get("MODEL_ID", "claude-haiku-4-5-20251001")
+LITELLM_BASE_URL = os.environ.get("LITELLM_BASE_URL", "http://litellm:4000/v1")
+MODEL_ID = os.environ.get("MODEL_ID", "nemotron-3-free")
+LLM_MAX_TOKENS = int(os.environ.get("LLM_MAX_TOKENS", "4096"))
 
 SYSTEM_PROMPT = """You are a helpful movie assistant connected to a home media server.
 
@@ -57,18 +59,50 @@ Guidelines:
 
 # Conversation history per session (in-memory, fine for single user)
 sessions: dict[str, list[dict]] = defaultdict(list)
+agents: dict[str, Agent] = {}
 
 # MCP client and agent are initialized on startup
 mcp_client: MCPClient | None = None
-agent: Agent | None = None
+model: OpenAIModel | None = None
+tools: list = []
 
 
 # ── App ───────────────────────────────────────────────────────
 
+def build_model() -> OpenAIModel:
+    """Build the OpenAI-compatible model used by Strands."""
+    logger.info(f"Routing LLM calls through {LITELLM_BASE_URL} using {MODEL_ID}")
+    return OpenAIModel(
+        client_args={
+            "api_key": LLM_API_KEY,
+            "base_url": LITELLM_BASE_URL,
+        },
+        model_id=MODEL_ID,
+        params={
+            "max_tokens": LLM_MAX_TOKENS,
+            "extra_body": {
+                "reasoning": {
+                    "effort": "none",
+                    "exclude": True,
+                },
+            },
+        },
+    )
+
+
+def build_agent() -> Agent:
+    """Build an isolated movie agent for one chat session."""
+    return Agent(
+        model=model or build_model(),
+        system_prompt=SYSTEM_PROMPT,
+        tools=tools,
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start MCP client connection and create agent on startup."""
-    global mcp_client, agent
+    global mcp_client, model, tools
 
     logger.info(f"Connecting to Movie MCP Server at {MOVIE_MCP_URL}")
 
@@ -91,17 +125,7 @@ async def lifespan(app: FastAPI):
     tools = mcp_client.list_tools_sync()
     logger.info(f"Loaded {len(tools)} tools from Movie MCP Server")
 
-    model = AnthropicModel(
-        client_args={"api_key": ANTHROPIC_API_KEY},
-        model_id=MODEL_ID,
-        max_tokens=1024,
-    )
-
-    agent = Agent(
-        model=model,
-        system_prompt=SYSTEM_PROMPT,
-        tools=tools,
-    )
+    model = build_model()
 
     logger.info("Movie Agent ready")
     yield
@@ -132,7 +156,7 @@ class ChatResponse(BaseModel):
 @app.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
     """Handle a chat message. Sends to the Strands Agent with conversation history."""
-    if agent is None:
+    if model is None:
         return JSONResponse(
             status_code=503,
             content={"error": "Agent not initialized yet."},
@@ -142,11 +166,15 @@ async def chat(req: ChatRequest):
 
     # Add user message to history
     sessions[session_id].append({"role": "user", "content": req.message})
+    session_agent = agents.get(session_id)
+    if session_agent is None:
+        session_agent = build_agent()
+        agents[session_id] = session_agent
 
     try:
         with langfuse.start_as_current_observation(as_type="span", name="movie-agent-chat"):
             with propagate_attributes(session_id=session_id):
-                result = agent(req.message)
+                result = session_agent(req.message)
                 response_text = str(result)
 
         sessions[session_id].append({"role": "assistant", "content": response_text})
@@ -161,7 +189,7 @@ async def chat(req: ChatRequest):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "agent_ready": agent is not None}
+    return {"status": "ok", "agent_ready": model is not None}
 
 
 # ── Run ───────────────────────────────────────────────────────

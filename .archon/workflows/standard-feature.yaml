@@ -1,0 +1,101 @@
+name: standard-feature
+description: |
+  Standardized end-to-end development workflow.
+  Mirrors docs/dev-workflow.md and makes each phase a deterministic, observable step.
+  Use for any non-trivial feature or change.
+provider: claude
+model: sonnet
+nodes:
+  # Phase 1: Discover
+  - id: brainstorm
+    prompt: |
+      Use the superpowers:brainstorming skill to explore intent and requirements for: $ARGUMENTS
+
+      Output a concise summary of what is being built and why.
+
+  - id: spec
+    depends_on: [brainstorm]
+    prompt: |
+      Read $brainstorm.output. Apply the spec-driven-development skill to produce a written specification with acceptance criteria.
+      Save the spec to $ARTIFACTS_DIR/spec.md.
+
+  # Phase 2: Plan
+  - id: plan
+    depends_on: [spec]
+    prompt: |
+      Read the spec at $ARTIFACTS_DIR/spec.md. Apply the source-driven-development skill to ground decisions in official documentation for any libraries/frameworks involved.
+      Then use the superpowers:writing-plans skill to break the work into ordered tasks with dependencies and acceptance criteria.
+      Save the plan to $ARTIFACTS_DIR/plan.md.
+
+  - id: doubt-check
+    depends_on: [plan]
+    prompt: |
+      Read $ARTIFACTS_DIR/plan.md. Apply the doubt-driven-development skill: subject the plan to adversarial review.
+      Identify risks, hidden assumptions, and irreversible operations. Update the plan in place if you find material issues.
+
+  # Phase 3: Implement
+  - id: implement
+    depends_on: [doubt-check]
+    loop:
+      prompt: |
+        Read the plan at $ARTIFACTS_DIR/plan.md. Identify the next incomplete task.
+        Use superpowers:test-driven-development (write failing test first) and superpowers:subagent-driven-development to implement it.
+        Update the plan to mark the task complete. Run validation.
+        When ALL tasks are complete, say "ALL_TASKS_COMPLETE" exactly.
+      until: ALL_TASKS_COMPLETE
+      max_iterations: 50
+      fresh_context: true
+
+  # Phase 4: Verify
+  - id: verify
+    depends_on: [implement]
+    prompt: |
+      Use the superpowers:verification-before-completion skill.
+      Run the actual verification commands (tests, type-check, lint, build). Confirm output.
+      Do NOT claim success without evidence. If anything fails, report what failed and exit non-zero.
+
+  # Phase 5: Review
+  - id: code-review
+    depends_on: [verify]
+    prompt: |
+      Apply the code-review-and-quality skill: 5-axis review of all changes.
+      Axes: correctness, readability, architecture, security, performance.
+      Save findings to $ARTIFACTS_DIR/review.md.
+
+  - id: security-gate
+    depends_on: [verify]
+    prompt: |
+      Apply the security-and-hardening skill as a security gate. Check OWASP top 10 patterns, auth boundaries, input validation, secret handling.
+      Save findings to $ARTIFACTS_DIR/security-review.md.
+
+  - id: address-feedback
+    depends_on: [code-review, security-gate]
+    prompt: |
+      Read $ARTIFACTS_DIR/review.md and $ARTIFACTS_DIR/security-review.md.
+      Use the superpowers:receiving-code-review skill to evaluate findings with technical rigor (not blind agreement).
+      Implement fixes for valid findings. Document any rejected findings with rationale.
+
+  # Phase 6: Integrate
+  - id: document
+    depends_on: [address-feedback]
+    prompt: |
+      Use the documentation-and-adrs skill. Record any architectural decisions, public API changes, or context future engineers will need.
+      If an ADR is warranted, save to $DOCS_DIR/adrs/.
+
+  - id: approve
+    depends_on: [document]
+    loop:
+      prompt: |
+        Present the completed work for human approval.
+        Summary: spec at $ARTIFACTS_DIR/spec.md, plan at $ARTIFACTS_DIR/plan.md, review at $ARTIFACTS_DIR/review.md.
+        Wait for approval. If feedback provided in $LOOP_USER_INPUT, address it.
+      until: APPROVED
+      max_iterations: 20
+      interactive: true
+      gate_message: "Review the spec, plan, and review artifacts. Approve to integrate, or reject with feedback to address."
+
+  - id: finish-branch
+    depends_on: [approve]
+    prompt: |
+      Use the superpowers:finishing-a-development-branch skill.
+      Present integration options (merge / PR / cleanup) and execute the chosen path.

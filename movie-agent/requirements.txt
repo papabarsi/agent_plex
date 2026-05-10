@@ -1,4 +1,4 @@
-strands-agents[anthropic,otel]
+strands-agents[openai,otel]
 langfuse>=3,<4
 mcp
 httpx
