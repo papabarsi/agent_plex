@@ -54,11 +54,14 @@ async def search_series(query: str) -> str:
         seasons = s.get("seasonCount", "?")
         network = s.get("network", "Unknown")
 
+        images = s.get("images", [])
+        poster = next((img.get("remoteUrl", "") for img in images if img.get("coverType") == "poster"), "")
         output.append(
             f"- {s.get('title')} ({s.get('year', '?')})\n"
             f"  TVDB: {s.get('tvdbId')} | Seasons: {seasons} | Network: {network}\n"
             f"  Status: {status}\n"
             f"  {overview}"
+            + (f"\n  Poster: {poster}" if poster else "")
         )
     return "\n\n".join(output)
 

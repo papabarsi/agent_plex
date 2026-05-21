@@ -51,10 +51,12 @@ async def search_movie(query: str) -> str:
         if len(overview) > 200:
             overview = overview[:200] + "..."
 
+        poster = m.get("remotePoster", "")
         output.append(
             f"- {m.get('title')} ({m.get('year', '?')})\n"
             f"  TMDB: {m.get('tmdbId')} | Status: {status}\n"
             f"  {overview}"
+            + (f"\n  Poster: {poster}" if poster else "")
         )
     return "\n\n".join(output)
 
