@@ -1,8 +1,7 @@
 .env
-.env.op
+# .env.op is safe to commit (contains only op:// references, not secrets)
 __pycache__/
 *.pyc
 .venv/
 system-test.md
-.gitnexus
 graphify-out/
