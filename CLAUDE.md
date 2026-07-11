@@ -52,65 +52,26 @@ Self-hosted Langfuse v3 provides tracing and session tracking for all agents.
 
 ## Deployment
 
-- Target: Proxmox LXC Docker host via Portainer stack
+- Target: bare-metal Ubuntu Docker host (Portainer stack)
 - External services on LAN: Radarr (:7878), Sonarr (:8989), Plex (:32400)
 
-## LXC + Docker Setup (Proxmox)
+## Host Networking Notes
 
-Running Docker inside an unprivileged LXC container requires specific configuration.
-These steps must be done **before installing Docker** for best results.
+The host is **bare-metal Ubuntu** — there is no Proxmox/LXC layer. Docker bridge
+networking works normally (outbound internet, DNS, inter-container DNS,
+published ports). Historical LXC/AppArmor workarounds were removed from these
+docs 2026-07-11 after verification; do not reintroduce them.
 
-### 1. Proxmox LXC Config (`/etc/pve/lxc/<CT_ID>.conf`)
+Two things future agents should know:
 
-Add these three lines:
-
-```
-lxc.mount.auto: proc:rw sys:rw
-lxc.apparmor.profile: unconfined
-lxc.mount.entry: /sys/kernel/security sys/kernel/security none bind,optional 0 0
-```
-
-Then restart the container: `pct stop <CT_ID> && pct start <CT_ID>`
-
-### 2. AppArmor Fix for Docker Builds
-
-Even with the LXC config above, `docker build` fails with:
-```
-unable to apply apparmor profile: apparmor failed to apply profile: write fsmount:fscontext:proc/thread-self/attr/apparmor/exec: no such file or directory
-```
-
-**Fix**: Hide `apparmor_parser` so runc skips AppArmor entirely:
-
-```bash
-sudo mv /sbin/apparmor_parser /sbin/apparmor_parser.bak
-sudo systemctl restart docker
-```
-
-This must be done on each Docker LXC host. To undo: `sudo mv /sbin/apparmor_parser.bak /sbin/apparmor_parser`
-
-### 3. Portainer Agent
-
-The Portainer agent container must be created with `--security-opt apparmor=unconfined`,
-otherwise it fails with `permission denied` on `/sys/kernel/security/apparmor/profiles`.
-
-Every time Docker is restarted, the agent container dies and must be recreated:
-
-```bash
-docker rm -f portainer_agent
-docker run -d \
-  --name portainer_agent \
-  --restart=always \
-  --security-opt apparmor=unconfined \
-  -p 9001:9001 \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v /var/lib/docker/volumes:/var/lib/docker/volumes \
-  portainer/agent:2.39.0
-```
-
-### 4. Docker Compose Services
-
-All services in `docker-compose.yml` need `security_opt: apparmor:unconfined`
-to run inside the LXC container.
+1. **Cloudflare tunnel routing**: `cloudflared` runs as a systemd service *on
+   the host* and its ingress targets `http://localhost:<port>`. Any service
+   exposed through the tunnel must be reachable on host loopback — either
+   `network_mode: host` or a published `ports:` mapping. Bridge-only internal
+   ports are not reachable by the tunnel.
+2. **Leftover `security_opt: apparmor:unconfined`** entries in some compose
+   files date from the old LXC deployment. They are not required on this host
+   (they disable AppArmor confinement); don't copy them into new services.
 
 ## Rebuilding Agent Images
 
@@ -142,46 +103,3 @@ op run --env-file .env.op -- docker compose up -d litellm movie-agent tv-agent m
 
 `.env.op` stores only a 1Password secret reference and is ignored by git.
 
-<!-- gitnexus:start -->
-# GitNexus — Code Intelligence
-
-This project is indexed by GitNexus as **media** (392 symbols, 450 relationships, 3 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
-
-> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
-
-## Always Do
-
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
-- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
-- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
-
-## Never Do
-
-- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
-- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
-- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
-
-## Resources
-
-| Resource | Use for |
-|----------|---------|
-| `gitnexus://repo/media/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/media/clusters` | All functional areas |
-| `gitnexus://repo/media/processes` | All execution flows |
-| `gitnexus://repo/media/process/{name}` | Step-by-step execution trace |
-
-## CLI
-
-| Task | Read this skill file |
-|------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
-
-<!-- gitnexus:end -->
