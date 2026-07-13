@@ -1,3 +1,4 @@
+name: media-agent-stack   # pin project so compose adopts the REAL langfuse volumes (not empty media_* set)
 services:
   webui:
     image: media-webui:latest
