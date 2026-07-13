@@ -1,48 +1,5 @@
 name: media-agent-stack   # pin project so compose adopts the REAL langfuse volumes (not empty media_* set)
 services:
-  webui:
-    image: media-webui:latest
-    container_name: media-webui
-    restart: unless-stopped
-    security_opt:
-      - apparmor:unconfined
-    ports:
-      - "3000:3000"
-    environment:
-      - MEDIA_AGENT_URL=http://media-agent:8000
-    depends_on:
-      - media-agent
-    networks:
-      - media-agent-net
-
-  movie-agent:
-    image: movie-agent:latest
-    container_name: movie-agent
-    restart: unless-stopped
-    security_opt:
-      - apparmor:unconfined
-    ports:
-      - "8001:8001"
-    environment:
-      - LLM_API_KEY=${LITELLM_API_KEY:-sk-local}
-      - MOVIE_MCP_URL=http://movie-mcp-server:8101
-      - LITELLM_BASE_URL=http://litellm:4000/v1
-      - MODEL_ID=${MODEL_ID:-nemotron-3-free}
-      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-4096}
-      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
-      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
-      - LANGFUSE_BASE_URL=http://langfuse-web:3000
-      - OTEL_BSP_SCHEDULE_DELAY_MILLIS=5000
-      - OTEL_BSP_MAX_QUEUE_SIZE=2048
-      - OTEL_BSP_MAX_EXPORT_BATCH_SIZE=512
-      - OTEL_BSP_EXPORT_TIMEOUT_MILLIS=2000
-      - OTEL_EXPORTER_OTLP_TIMEOUT=2000
-    depends_on:
-      - movie-mcp-server
-      - litellm
-    networks:
-      - media-agent-net
-
   movie-mcp-server:
     image: movie-mcp-server:latest
     container_name: movie-mcp-server
@@ -61,34 +18,6 @@ services:
       - media-agent-net
 
   # ── Stage 1b ──────────────────────────────
-  tv-agent:
-    image: tv-agent:latest
-    container_name: tv-agent
-    restart: unless-stopped
-    security_opt:
-      - apparmor:unconfined
-    ports:
-      - "8002:8002"
-    environment:
-      - LLM_API_KEY=${LITELLM_API_KEY:-sk-local}
-      - TV_MCP_URL=http://tv-mcp-server:8102
-      - LITELLM_BASE_URL=http://litellm:4000/v1
-      - MODEL_ID=${MODEL_ID:-nemotron-3-free}
-      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-4096}
-      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
-      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
-      - LANGFUSE_BASE_URL=http://langfuse-web:3000
-      - OTEL_BSP_SCHEDULE_DELAY_MILLIS=5000
-      - OTEL_BSP_MAX_QUEUE_SIZE=2048
-      - OTEL_BSP_MAX_EXPORT_BATCH_SIZE=512
-      - OTEL_BSP_EXPORT_TIMEOUT_MILLIS=2000
-      - OTEL_EXPORTER_OTLP_TIMEOUT=2000
-    depends_on:
-      - tv-mcp-server
-      - litellm
-    networks:
-      - media-agent-net
-
   tv-mcp-server:
     image: tv-mcp-server:latest
     container_name: tv-mcp-server
@@ -107,37 +36,6 @@ services:
       - media-agent-net
 
   # ── Stage 2 — Media Multi Agent ───────────
-  media-agent:
-    image: media-agent:latest
-    container_name: media-agent
-    restart: unless-stopped
-    security_opt:
-      - apparmor:unconfined
-    ports:
-      - "8000:8000"
-    environment:
-      - LLM_API_KEY=${LITELLM_API_KEY:-sk-local}
-      - MOVIE_AGENT_URL=http://movie-agent:8001
-      - TV_AGENT_URL=http://tv-agent:8002
-      - LITELLM_BASE_URL=http://litellm:4000/v1
-      - MODEL_ID=${MODEL_ID:-nemotron-3-free}
-      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-4096}
-      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
-      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
-      - LANGFUSE_BASE_URL=http://langfuse-web:3000
-      - OTEL_BSP_SCHEDULE_DELAY_MILLIS=5000
-      - OTEL_BSP_MAX_QUEUE_SIZE=2048
-      - OTEL_BSP_MAX_EXPORT_BATCH_SIZE=512
-      - OTEL_BSP_EXPORT_TIMEOUT_MILLIS=2000
-      - OTEL_EXPORTER_OTLP_TIMEOUT=2000
-    depends_on:
-      - movie-agent
-      - tv-agent
-      - litellm
-    networks:
-      - media-agent-net
-
-  # ── LiteLLM Proxy ─────────────────────────
   litellm:
     image: ghcr.io/berriai/litellm:v1.83.7-stable
     container_name: litellm
