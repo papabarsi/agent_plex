@@ -4,4 +4,3 @@ __pycache__/
 *.pyc
 .venv/
 system-test.md
-graphify-out/
